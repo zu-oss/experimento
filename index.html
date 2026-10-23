@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Experimento Streaming</title>
+    <style>
+        body { background-color: #141414; color: white; font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 40px 10px; }
+        button { cursor: pointer; }
+
+        /* Telas de instruções (ficam por cima de tudo até o participante iniciar o vídeo) */
+        .tela-instrucoes { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #141414; z-index: 100; overflow-y: auto; padding: 30px 16px; box-sizing: border-box; }
+        .instrucoes { max-width: 720px; margin: 0 auto; text-align: left; line-height: 1.6; }
+        .instrucoes h1, .instrucoes h2 { text-align: center; }
+        .instrucoes li { margin-bottom: 10px; }
+        .botoes-grupo { text-align: center; margin: 24px 0; }
+        .botoes-grupo button, #btn-iniciar { font-size: 22px; padding: 14px 34px; margin: 8px; }
+        #btn-whatsapp { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; background: #25D366; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; }
+        #btn-whatsapp svg { width: 22px; height: 22px; fill: currentColor; }
+
+        /* Área do vídeo */
+        .video-container { position: relative; width: 800px; max-width: 100%; height: 450px; margin: 0 auto; background: black; border: 2px solid #333; }
+        .video-container:fullscreen { width: 100vw; height: 100vh; max-width: none; border: none; }
+        video { width: 100%; height: 100%; display: block; }
+        #main-video { height: calc(100% - 44px); }
+
+        /* Controles próprios (sem barra de avanço clicável) */
+        #controles { position: absolute; bottom: 0; left: 0; width: 100%; height: 44px; background: #1f1f1f; display: flex; align-items: center; gap: 10px; padding: 0 10px; box-sizing: border-box; }
+        #btn-play, #btn-tela { background: none; border: 1px solid #666; color: white; padding: 4px 10px; font-size: 14px; }
+        #barra { flex: 1; height: 6px; background: #444; border-radius: 3px; }
+        #progresso { height: 100%; width: 0%; background: #e50914; border-radius: 3px; }
+        #tempo { font-size: 13px; min-width: 90px; }
+
+        /* Camada do anúncio (fica por cima do vídeo) */
+        #ad-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: black; z-index: 10; }
+        #ad-badge { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.6); padding: 5px 10px; font-size: 12px; border-radius: 3px; z-index: 11; }
+        #skip-btn { position: absolute; bottom: 40px; right: 20px; padding: 10px 20px; background: rgba(0,0,0,0.8); border: 1px solid white; color: white; display: none; font-size: 16px; z-index: 11; }
+
+        /* Botões do canto superior direito (sempre visíveis, acima do anúncio) */
+        #topo-botoes { position: absolute; top: 12px; right: 12px; z-index: 20; display: flex; gap: 8px; }
+        #topo-botoes button { padding: 6px 12px; font-size: 12px; background: rgba(0,0,0,0.7); border-radius: 3px; }
+        #btn-desistir { border: 1px solid #888; color: #ddd; }
+        #btn-desistir:hover { background: rgba(150,0,0,0.85); color: white; }
+        #btn-premium { border: 1px solid #f5c518; color: #f5c518; }
+        #btn-premium:hover { background: #f5c518; color: black; }
+
+        /* Tela final (fim do vídeo, desistência ou premium) */
+        #fim-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: #141414; z-index: 15; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+        #fim-layer h3 { margin: 0 0 10px 0; }
+        #fim-layer p { max-width: 520px; line-height: 1.5; }
+        #fim-layer a { display: inline-block; margin-top: 10px; padding: 12px 24px; background: #e50914; color: white; text-decoration: none; border-radius: 4px; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+    <!-- TELA 1: instruções gerais + escolha do grupo -->
+    <div id="setup" class="tela-instrucoes">
+        <div class="instrucoes">
+            <h1>Instruções para o experimento</h1>
+
+            <p>Obrigado por participar!</p>
+
+            <p>O experimento todo levará por volta de 15 minutos: os primeiros 5 minutos serão para assistir ao vídeo e o restante para preencher o formulário.</p>
+
+            <p>No formulário, será pedido que você descreva a animação com o máximo de detalhes que conseguir lembrar. Haverá também uma parte com perguntas sobre a sua experiência com o vídeo e outra com perguntas sobre o teste em si.</p>
+
+            <p>As respostas são anônimas e serão usadas para medir a cognição, a experiência e as emoções geradas pelo vídeo e pelo experimento como um todo.</p>
+
+            <p>Caso tenha algum problema ou dúvidas, entre em contato por WhatsApp pelo número +55 17 98230-8463:</p>
+            <p>
+                <a id="btn-whatsapp" href="https://wa.me/5517982308463" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                    WhatsApp
+                </a>
+            </p>
+
+            <p>O vídeo possui um botão de pausa, mas não será possível avançar nem retroceder. Preste bastante atenção na história.</p>
+
+            <p>Após os créditos da animação, aparecerá na tela o link para o formulário.</p>
+
+            <p>Você poderá desistir do teste a qualquer momento clicando no botão de desistir. O vídeo será encerrado e aparecerá na tela o link para o questionário de desistência (apenas para informar o motivo).</p>
+
+            <p>Obrigado novamente por participar do experimento e bom vídeo!</p>
+
+            <p><strong>Para começar, escolha o seu grupo abaixo.</strong> Depois de escolher, não atualize nem feche a página até o experimento acabar.</p>
+
+            <div class="botoes-grupo">
+                <button onclick="escolherGrupo('a')">A</button>
+                <button onclick="escolherGrupo('b')">B</button>
+                <button onclick="escolherGrupo('c')">C</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TELA 2: instruções do grupo escolhido (o texto é igual para A, B e C, de propósito) -->
+    <div id="instr-grupo" class="tela-instrucoes" style="display:none">
+        <div class="instrucoes">
+            <h2 id="instr-titulo">Instruções</h2>
+            <ul>
+                <li>Depois que o vídeo começar, será possível pausar e despausar, mas não avançar nem retroceder.</li>
+                <li>Assista com atenção: ao final, você vai descrever o que viu com o máximo de detalhes possível.</li>
+                <li>O link do formulário aparecerá na tela depois dos créditos, quando o vídeo terminar por completo.</li>
+                <li>Não atualize a página nem a feche durante o vídeo.</li>
+                <li>Se precisar ou quiser desistir, clique em "Desistir do teste" e responda ao questionário de desistência.</li>
+            </ul>
+            <div class="botoes-grupo">
+                <button id="btn-iniciar" onclick="iniciarExperimento()">Iniciar vídeo</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="video-container" id="container">
+        <!-- Vídeo principal: SEM "controls", assim o participante não consegue avançar -->
+        <video id="main-video" playsinline preload="auto">
+            <source src="videos/snackattack.mp4.mp4" type="video/mp4">
+            Seu navegador não suporta vídeos.
+        </video>
+
+        <div id="controles">
+            <button id="btn-play">▶ Play</button>
+            <div id="barra"><div id="progresso"></div></div>
+            <span id="tempo">0:00 / 0:00</span>
+            <input type="range" id="volume" min="0" max="1" step="0.05" value="1">
+            <button id="btn-tela">⛶</button>
+        </div>
+
+        <!-- Camada de propaganda (o arquivo de cada anúncio é trocado pelo JavaScript) -->
+        <div id="ad-layer">
+            <span id="ad-badge">Publicidade</span>
+            <video id="ad-video" playsinline></video>
+            <button id="skip-btn" onclick="pularAnuncio()">Pular Anúncio</button>
+        </div>
+
+        <!-- Tela final -->
+        <div id="fim-layer">
+            <h3 id="fim-titulo"></h3>
+            <p id="fim-texto"></p>
+            <a id="fim-link" href="#" target="_blank" rel="noopener">Abrir formulário</a>
+        </div>
+
+        <!-- Botões sempre visíveis -->
+        <div id="topo-botoes">
+            <button id="btn-premium" onclick="ativarPremium()">★ Premium: sem anúncios</button>
+            <button id="btn-desistir" onclick="desistir()">Desistir do teste</button>
+        </div>
+    </div>
+
+    <script>
+        // ================== CONFIGURAÇÕES (edite aqui) ==================
+
+        // Links dos 3 formulários
+        const LINK_FORMS_FINAL = 'https://docs.google.com/forms/d/e/1FAIpQLSfbZl_K1YShso_3pelwmYh7EU_KFKeScKa-8ui-Ed3bUlBMaA/viewform?usp=publish-editor';
+        const LINK_FORMS_DESISTENCIA = 'https://docs.google.com/forms/d/e/1FAIpQLSfRCQEvOsqR2xZJf26KHifbxpAx5bY76kU6RHfvpVzUpn48_A/viewform?usp=publish-editor';
+        const LINK_FORMS_PREMIUM = 'https://docs.google.com/forms/d/e/1FAIpQLSfqi_MbSj3vZ2zDmmMAYq9vwC-Kw1f1CoX3D-Hzx317rg_5-g/viewform?usp=publish-editor';
+
+        // 4 intervalos. Em cada um tocam 2 anúncios seguidos (15 a 30s cada):
+        // no grupo B os dois podem ser pulados depois de 5s; no grupo C são forçados.
+        const INTERVALOS = [
+            { primeiro: 'videos/ads/ad1_1.mp4', segundo: 'videos/ads/ad2_1.mp4' },
+            { primeiro: 'videos/ads/ad1_2.mp4', segundo: 'videos/ads/ad2_2.mp4' },
+            { primeiro: 'videos/ads/ad1_3.mp4', segundo: 'videos/ads/ad2_3.mp4' },
+            { primeiro: 'videos/ads/ad1_4.mp4', segundo: 'videos/ads/ad2_4.mp4' }
+        ];
+
+        // Momento (em segundos) de cada intervalo. Se deixar null, os intervalos entram
+        // automaticamente em 20%, 40%, 60% e 80% do vídeo. Exemplo manual: [30, 75, 120, 180]
+        const TEMPOS_MANUAIS = null;
+
+        // No grupo B, depois de quantos segundos do anúncio longo aparece o botão "Pular"
+        const SEGUNDOS_PARA_PULAR = 5;
+
+        // =================================================================
+
+        const container = document.getElementById('container');
+        const mainVideo = document.getElementById('main-video');
+        const adLayer = document.getElementById('ad-layer');
+        const adVideo = document.getElementById('ad-video');
+        const adBadge = document.getElementById('ad-badge');
+        const skipBtn = document.getElementById('skip-btn');
+        const btnPlay = document.getElementById('btn-play');
+        const btnTela = document.getElementById('btn-tela');
+        const btnPremium = document.getElementById('btn-premium');
+        const btnDesistir = document.getElementById('btn-desistir');
+        const fimLayer = document.getElementById('fim-layer');
+        const progresso = document.getElementById('progresso');
+        const tempoTxt = document.getElementById('tempo');
+        const volume = document.getElementById('volume');
+
+        let grupo = null;            // 'a' (sem anúncio), 'b' (pulável), 'c' (forçado)
+        let proximoIntervalo = 0;    // qual intervalo vem a seguir (0 a 3)
+        let fila = [];               // anúncios que ainda faltam tocar no intervalo atual
+        let anuncioAtivo = false;
+        let testeEncerrado = false;
+        let iniciado = false;        // true depois que o participante clica em "Iniciar vídeo"
+        let premiumAtivo = false;    // true depois que o participante clica em Premium
+        let adAtual = null;          // anúncio que está tocando agora
+        let maxAssistido = 0;        // ponto mais avançado já assistido (bloqueia avanço)
+        let timerSkip = null;
+
+        // ---------- ESCOLHA DO GRUPO ----------
+        function escolherGrupo(g) {
+            grupo = g;
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('instr-titulo').innerText = 'Instruções · Grupo ' + g.toUpperCase();
+            document.getElementById('instr-grupo').style.display = 'block';
+            // O botão Premium começa escondido: no grupo A nunca aparece (não há anúncios);
+            // nos grupos B e C aparece só depois dos dois primeiros anúncios (ver terminarIntervalo)
+            btnPremium.style.display = 'none';
+        }
+
+        function iniciarExperimento() {
+            iniciado = true;
+            document.getElementById('instr-grupo').style.display = 'none';
+        }
+
+        // ---------- CONTROLES DO VÍDEO PRINCIPAL ----------
+        btnPlay.addEventListener('click', () => {
+            if (!grupo || !iniciado || anuncioAtivo || testeEncerrado) return;
+            if (mainVideo.ended) return;
+            if (mainVideo.paused) mainVideo.play(); else mainVideo.pause();
+        });
+
+        mainVideo.addEventListener('play', () => { btnPlay.innerText = '❚❚ Pause'; });
+        mainVideo.addEventListener('pause', () => { btnPlay.innerText = '▶ Play'; });
+
+        mainVideo.addEventListener('ended', () => {
+            btnPlay.innerText = '✔ Fim';
+            if (testeEncerrado) return;
+            encerrarTeste(
+                'Obrigado por participar!',
+                'Para finalizar, clique no botão abaixo e responda ao questionário.',
+                premiumAtivo ? LINK_FORMS_PREMIUM : LINK_FORMS_FINAL,
+                false
+            );
+        });
+
+        volume.addEventListener('input', () => { mainVideo.volume = volume.value; adVideo.volume = volume.value; });
+
+        btnTela.addEventListener('click', () => {
+            // Tela cheia no conjunto inteiro (assim o anúncio e os botões também aparecem)
+            if (document.fullscreenElement) document.exitFullscreen();
+            else container.requestFullscreen();
+        });
+
+        function formatar(s) {
+            s = Math.floor(s || 0);
+            return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+        }
+
+        // ---------- BLOQUEIO DE AVANÇO ----------
+        mainVideo.addEventListener('seeking', () => {
+            if (mainVideo.currentTime > maxAssistido + 0.5) {
+                mainVideo.currentTime = maxAssistido;
+            }
+        });
+
+        // ---------- MOMENTO DOS INTERVALOS ----------
+        function obterTempos() {
+            if (TEMPOS_MANUAIS) return TEMPOS_MANUAIS;
+            const d = mainVideo.duration;
+            if (!d || !isFinite(d)) return [];
+            return [0.2, 0.4, 0.6, 0.8].map(p => Math.floor(d * p));
+        }
+
+        mainVideo.addEventListener('timeupdate', () => {
+            if (!mainVideo.seeking && mainVideo.currentTime > maxAssistido) {
+                maxAssistido = mainVideo.currentTime;
+            }
+
+            if (mainVideo.duration) {
+                progresso.style.width = (mainVideo.currentTime / mainVideo.duration * 100) + '%';
+                tempoTxt.innerText = formatar(mainVideo.currentTime) + ' / ' + formatar(mainVideo.duration);
+            }
+
+            // Dispara o próximo intervalo (grupos B e C)
+            const tempos = obterTempos();
+            if (grupo && grupo !== 'a' && !anuncioAtivo && !testeEncerrado && !premiumAtivo &&
+                proximoIntervalo < tempos.length && proximoIntervalo < INTERVALOS.length &&
+                mainVideo.currentTime >= tempos[proximoIntervalo]) {
+                iniciarIntervalo(proximoIntervalo);
+                proximoIntervalo++;
+            }
+        });
+
+        // ---------- ANÚNCIOS ----------
+        function iniciarIntervalo(i) {
+            anuncioAtivo = true;
+            mainVideo.pause();
+            fila = [
+                { arquivo: INTERVALOS[i].primeiro },
+                { arquivo: INTERVALOS[i].segundo }
+            ];
+            adLayer.style.display = 'block';
+            tocarProximoAnuncio();
+        }
+
+        function tocarProximoAnuncio() {
+            clearTimeout(timerSkip);
+            skipBtn.style.display = 'none';
+
+            if (fila.length === 0) { terminarIntervalo(); return; }
+
+            const ad = fila.shift();
+            const numero = 2 - fila.length; // 1 para o primeiro, 2 para o segundo
+            adBadge.innerText = 'Publicidade · ' + numero + ' de 2';
+
+            // Quando o anúncio acaba (ou o arquivo dá erro), passa para o próximo
+            adVideo.onended = tocarProximoAnuncio;
+            adVideo.onerror = tocarProximoAnuncio;
+
+            adVideo.src = ad.arquivo;
+            adVideo.load();
+            adVideo.play().catch(() => {});
+
+            // Guarda qual anúncio está tocando; o botão de pular (só no grupo B, nos dois anúncios)
+            // aparece pelo evento 'timeupdate' logo abaixo, depois de 5s de reprodução real
+            adAtual = ad;
+        }
+
+        adVideo.addEventListener('timeupdate', () => {
+            if (grupo === 'b' && anuncioAtivo && adAtual &&
+                adVideo.currentTime >= SEGUNDOS_PARA_PULAR) {
+                skipBtn.style.display = 'block';
+            }
+        });
+
+        function pularAnuncio() {
+            clearTimeout(timerSkip);
+            adVideo.pause();
+            tocarProximoAnuncio();
+        }
+
+        function terminarIntervalo() {
+            clearTimeout(timerSkip);
+            adVideo.onended = null;
+            adVideo.onerror = null;
+            adVideo.pause();
+            adLayer.style.display = 'none';
+            skipBtn.style.display = 'none';
+            anuncioAtivo = false;
+
+            // Depois dos dois primeiros anúncios, o botão Premium passa a aparecer
+            if (grupo !== 'a') btnPremium.style.display = '';
+
+            mainVideo.play();
+        }
+
+        // ---------- FIM, DESISTÊNCIA E PREMIUM ----------
+        function encerrarTeste(titulo, texto, link, abrirAba) {
+            testeEncerrado = true;
+            anuncioAtivo = false;
+            clearTimeout(timerSkip);
+            mainVideo.pause();
+            adVideo.onended = null;
+            adVideo.onerror = null;
+            adVideo.pause();
+            adLayer.style.display = 'none';
+            skipBtn.style.display = 'none';
+            if (document.fullscreenElement) document.exitFullscreen();
+
+            document.getElementById('fim-titulo').innerText = titulo;
+            document.getElementById('fim-texto').innerText = texto;
+            document.getElementById('fim-link').href = link;
+            document.getElementById('topo-botoes').style.display = 'none';
+            fimLayer.style.display = 'flex';
+
+            if (abrirAba) window.open(link, '_blank');
+        }
+
+        function desistir() {
+            if (testeEncerrado) return;
+            if (!confirm('Tem certeza de que deseja desistir do teste?')) return;
+            encerrarTeste(
+                'Você desistiu do teste',
+                'Tudo bem! Se a página do formulário não abriu, clique no botão abaixo para nos contar o motivo.',
+                LINK_FORMS_DESISTENCIA,
+                true
+            );
+        }
+
+        function ativarPremium() {
+            if (testeEncerrado || premiumAtivo) return;
+            premiumAtivo = true;
+
+            // Cancela o anúncio que estiver tocando e os que ainda faltam
+            clearTimeout(timerSkip);
+            fila = [];
+            adVideo.onended = null;
+            adVideo.onerror = null;
+            adVideo.pause();
+            adLayer.style.display = 'none';
+            skipBtn.style.display = 'none';
+            anuncioAtivo = false;
+
+            // O botão vira um aviso de que o Premium está ativo
+            btnPremium.innerText = '★ Premium ativo';
+            btnPremium.disabled = true;
+            btnPremium.style.background = '#f5c518';
+            btnPremium.style.color = 'black';
+            btnPremium.style.cursor = 'default';
+
+            // Continua o vídeo de onde estava, agora sem anúncios
+            mainVideo.play();
+        }
+
+        // Evita o menu do botão direito (que tem opções de vídeo)
+        container.addEventListener('contextmenu', e => e.preventDefault());
+    </script>
+</body>
+</html>
