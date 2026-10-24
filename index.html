@@ -101,7 +101,7 @@
                 <li>Assista com atenção: ao final, iremo pedir para que você descreva o que viu com o máximo de detalhes possível.</li>
                 <li>O link do formulário aparecerá na tela depois dos créditos, quando o vídeo terminar por completo (após os créditos).</li>
                 <li>Não atualize a página nem a feche durante o vídeo.</li>
-                <li>Voçê pode para o teste a qualquer momento. Se precisar ou quiser desistir, clique em "Desistir do teste" e responda ao questionário de desistência.</li>
+                <li>Voçê pode parar o teste a qualquer momento. Se precisar ou quiser desistir, clique em "Desistir do teste" e responda ao questionário de desistência.</li>
                 <li>Todas as opções são simulações e não irão pedir nenhum dado ou cobrança real</li>
             </ul>
             <div class="botoes-grupo">
@@ -406,6 +406,15 @@
 
         // Evita o menu do botão direito (que tem opções de vídeo)
         container.addEventListener('contextmenu', e => e.preventDefault());
+
+// Embaralha a ordem dos botões A, B e C toda vez que a página é aberta
+const caixaBotoes = document.querySelector('#setup .botoes-grupo');
+const botoesGrupo = Array.from(caixaBotoes.children);
+for (let i = botoesGrupo.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [botoesGrupo[i], botoesGrupo[j]] = [botoesGrupo[j], botoesGrupo[i]];
+}
+botoesGrupo.forEach(b => caixaBotoes.appendChild(b));
     </script>
 </body>
 </html>
